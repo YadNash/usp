@@ -1,39 +1,30 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <limits.h>
-int main()
-{
-    // (i) No. of clock ticks
-    printf("Maximum number of clock ticks per second: %ld\n", sysconf(_SC_CLK_TCK));
-    // (ii) Max. no. of child processes
-    printf("Maximum number of child processes: %ld\n", sysconf(_SC_CHILD_MAX));
-    // (iii) Max. path length
-    printf("Maximum path length: %ld\n", pathconf("/", _PC_PATH_MAX));
-    // (iv) Max. no. of characters in a file name
-    printf("Maximum number of characters in a file name: %ld\n", pathconf("/", _PC_NAME_MAX));
-    // (v) Max. no. of open files per process
-    printf("Maximum number of open files per process: %ld\n", sysconf(_SC_OPEN_MAX));
-    // Retrieve system's page size
-    printf("System's page size: %ld bytes\n", sysconf(_SC_PAGESIZE));
-    // Retrieve system's hostname
-    char hostname[HOST_NAME_MAX];
-    if (gethostname(hostname, HOST_NAME_MAX) == 0)
-    {
-        printf("System hostname: %s\n", hostname);
-    }
-    else
-    {
-        perror("gethostname");
-    }
-    // Retrieve current working directory
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) != NULL)
-    {
-        printf("Current working directory: %s\n", cwd);
-    }
-    else
-    {
-        perror("getcwd");
-    }
-    return 0;
-}
+int main() {
+ int pipefd[2];
+ if (pipe(pipefd) == -1) {
+ perror("pipe");
+ exit(EXIT_FAILURE);
+ }
+ pid_t pid = fork();
+ if (pid == -1) {
+ perror("fork");
+ exit(EXIT_FAILURE);
+ }
+ if (pid == 0) { // Child process
+ close(pipefd[0]); // Close reading end of the pipe in the child process
+ dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to the writing end of the pipe
+ close(pipefd[1]); // Close the original writing end of the pipe
+ execlp("ls", "ls", "-l", NULL); // Execute the first command
+ perror("execlp ls");
+ exit(EXIT_FAILURE);
+ } else { // Parent process
+ close(pipefd[1]); // Close writing end of the pipe in the parent process
+ dup2(pipefd[0], STDIN_FILENO); // Redirect stdin to the reading end of the pipe
+ close(pipefd[0]); // Close the original reading end of the pipe
+ execlp("wc", "wc", "-l", NULL); // Execute the second command
+ perror("execlp wc");
+ exit(EXIT_FAILURE);
+ }
+ return 0;
